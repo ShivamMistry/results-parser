@@ -128,9 +128,10 @@ public class EvisionParser {
         try {
             Properties props = new Properties();
             try {
-                InputStream is = EvisionParser.class.getResourceAsStream("config.properties");
+                InputStream is = EvisionParser.class.getResourceAsStream("/config.properties");
                 if (is == null) {
                     System.err.println("No config file found, try copying the config.properties.example file");
+                    System.exit(3);
                 }
                 props.load(is);
             } catch (IOException e) {
