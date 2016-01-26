@@ -11,11 +11,13 @@ import org.jsoup.select.Elements;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.*;
 import java.util.*;
 
 public class EvisionParser {
 
     private static final String BASE_URL = "https://evision.york.ac.uk/urd/sits.urd/run/";
+    private static final String OUTPUT = "output.db";
 
     public final Collection<Module> modules;
 
@@ -48,7 +50,7 @@ public class EvisionParser {
         Document document = Jsoup.parse(html);
         Module module = null;
         List<Module.Result> results = new LinkedList<>();
-        for(Element e : document.select("table")) {
+        for (Element e : document.select("table")) {
             String summary = e.attr("summary");
             if (summary.equals("details of overall module result")) {
                 // Process module result
@@ -70,8 +72,7 @@ public class EvisionParser {
                 }
                 module = new Module(year, moduleCode, moduleName, credits, mark);
                 System.out.println(module);
-            }
-            else if (summary.equals("details of assessment components and feedback if available")) {
+            } else if (summary.equals("details of assessment components and feedback if available")) {
                 // Process components
                 Elements rows = e.select("tr");
 
@@ -146,9 +147,57 @@ public class EvisionParser {
             String password = props.getProperty("password");
             String url = props.getProperty("sitsUrl", SitsAuth.YORK_URL);
             String baseUrl = props.getProperty("baseUrl", BASE_URL);
-            new EvisionParser(baseUrl, SitsAuth.create(url, username, password));
-        } catch (IOException e) {
+            String outputFile = props.getProperty("outputFile", OUTPUT);
+            new EvisionParser(baseUrl, SitsAuth.create(url, username, password)).output(outputFile);
+        } catch (IOException | SQLException e) {
             e.printStackTrace();
         }
+    }
+
+    public void output(String outputFile) throws SQLException {
+        Connection connection = DriverManager.getConnection("jdbc:sqlite:" + outputFile);
+        Statement statement = connection.createStatement();
+        statement.setQueryTimeout(5);
+        statement.execute("DROP TABLE IF EXISTS modules");
+        statement.execute("DROP TABLE IF EXISTS results");
+        statement.execute("CREATE TABLE modules (code varchar primary key not null, modName varchar not null, yr varchar not null, mark integer, credits integer not null)");
+        statement.execute("CREATE TABLE results ( moduleCode varchar not null, resultName varchar not null, weighting integer not null, attempt integer, unconfirmed_mark integer, confirmed_mark integer, foreign key(moduleCode) references modules(code))");
+        PreparedStatement moduleMark = connection.prepareStatement("INSERT INTO modules (code, modName, yr, credits, mark) VALUES (?, ?, ?, ?, ?)");
+        PreparedStatement moduleNoMark = connection.prepareStatement("INSERT INTO modules (code, modName, yr, credits) VALUES (?, ?, ?, ?)");
+        PreparedStatement resultConfirmedMark = connection.prepareStatement("INSERT INTO results (moduleCode, resultName, weighting, attempt, confirmed_mark) VALUES (?, ?, ?, ?, ?)");
+        PreparedStatement resultUnconfirmedMark = connection.prepareStatement("INSERT INTO results (moduleCode, resultName, weighting, attempt, unconfirmed_mark) VALUES(?, ?, ?, ?, ?)");
+        PreparedStatement resultNoMark = connection.prepareStatement("INSERT INTO results (moduleCode, resultName, weighting, attempt) VALUES (?, ?, ?, ?)");
+        for (Module module : modules) {
+            PreparedStatement stmt = module.mark == -1 ? moduleNoMark : moduleMark;
+            stmt.setString(1, module.moduleCode);
+            stmt.setString(2, module.name);
+            stmt.setString(3, module.year);
+            stmt.setInt(4, module.credits);
+            if (module.mark != -1) {
+                stmt.setInt(5, module.mark);
+            }
+            stmt.execute();
+            for (Module.Result result : module.getResults()) {
+                PreparedStatement st;
+                if (result.confirmedResult == -1 && result.uncomfirmedResult == -1) {
+                    st = resultNoMark;
+                } else if (result.confirmedResult == -1) {
+                    st = resultUnconfirmedMark;
+                    st.setInt(5, result.uncomfirmedResult);
+                } else {
+                    st = resultConfirmedMark;
+                    st.setInt(5, result.confirmedResult);
+                }
+                st.setString(1, module.moduleCode);
+                st.setString(2, result.name);
+                st.setInt(3, result.weighting);
+                st.setInt(4, result.attempt);
+                st.execute();
+                st.clearParameters();
+
+            }
+            stmt.clearParameters();
+        }
+        connection.close();
     }
 }
