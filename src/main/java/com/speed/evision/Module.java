@@ -3,9 +3,6 @@ package com.speed.evision;
 import java.util.Collections;
 import java.util.List;
 
-/**
- * Created by shivam on 26/01/2016.
- */
 public class Module {
     public final String year;
     public final String moduleCode;
