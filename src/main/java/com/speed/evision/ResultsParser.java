@@ -14,7 +14,7 @@ import java.io.InputStream;
 import java.sql.*;
 import java.util.*;
 
-public class EvisionParser {
+public class ResultsParser {
 
     private static final String BASE_URL = "https://evision.york.ac.uk/urd/sits.urd/run/";
     private static final String OUTPUT = "output.db";
@@ -24,7 +24,7 @@ public class EvisionParser {
     private final String baseUrl;
     private final SitsAuth auth;
 
-    public EvisionParser(final String baseUrl, SitsAuth auth) throws IOException {
+    public ResultsParser(final String baseUrl, SitsAuth auth) throws IOException {
         this.baseUrl = baseUrl;
         this.auth = auth;
         Document document = auth.homepage;
@@ -125,34 +125,6 @@ public class EvisionParser {
         return baseUrl + path;
     }
 
-    public static void main(String[] args) {
-        try {
-            Properties props = new Properties();
-            try {
-                InputStream is = EvisionParser.class.getResourceAsStream("/config.properties");
-                if (is == null) {
-                    System.err.println("No config file found, try copying the config.properties.example file");
-                    System.exit(3);
-                }
-                props.load(is);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            if (props.isEmpty()) System.exit(1);
-            if (!props.containsKey("username") || !props.containsKey("password")) {
-                System.err.println("Properties file did not contain correct config, ensure that a username and password are present");
-                System.exit(2);
-            }
-            String username = props.getProperty("username");
-            String password = props.getProperty("password");
-            String url = props.getProperty("sitsUrl", SitsAuth.YORK_URL);
-            String baseUrl = props.getProperty("baseUrl", BASE_URL);
-            String outputFile = props.getProperty("outputFile", OUTPUT);
-            new EvisionParser(baseUrl, SitsAuth.create(url, username, password)).output(outputFile);
-        } catch (IOException | SQLException e) {
-            e.printStackTrace();
-        }
-    }
 
     public void output(String outputFile) throws SQLException {
         Connection connection = DriverManager.getConnection("jdbc:sqlite:" + outputFile);
@@ -200,4 +172,34 @@ public class EvisionParser {
         }
         connection.close();
     }
+
+    public static void main(String[] args) {
+        try {
+            Properties props = new Properties();
+            try {
+                InputStream is = ResultsParser.class.getResourceAsStream("/config.properties");
+                if (is == null) {
+                    System.err.println("No config file found, try copying the config.properties.example file");
+                    System.exit(3);
+                }
+                props.load(is);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            if (props.isEmpty()) System.exit(1);
+            if (!props.containsKey("username") || !props.containsKey("password")) {
+                System.err.println("Properties file did not contain correct config, ensure that a username and password are present");
+                System.exit(2);
+            }
+            String username = props.getProperty("username");
+            String password = props.getProperty("password");
+            String url = props.getProperty("sitsUrl", SitsAuth.YORK_URL);
+            String baseUrl = props.getProperty("baseUrl", BASE_URL);
+            String outputFile = props.getProperty("outputFile", OUTPUT);
+            new ResultsParser(baseUrl, SitsAuth.create(url, username, password)).output(outputFile);
+        } catch (IOException | SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
 }

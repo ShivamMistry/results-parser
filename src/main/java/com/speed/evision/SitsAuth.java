@@ -13,7 +13,6 @@ import org.apache.http.util.EntityUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 
-import javax.print.Doc;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +36,7 @@ public class SitsAuth {
         HttpGet get = new HttpGet(url);
         HttpResponse response = httpClient.execute(get);
         HttpPost post = new HttpPost("https://evision.york.ac.uk/urd/sits.urd/run/SIW_LGN");
-        List<NameValuePair> params = new ArrayList<NameValuePair>();
+        List<NameValuePair> params = new ArrayList<>();
         params.add(new BasicNameValuePair("MUA_CODE.DUMMY.MENSYS.1", username));
         params.add(new BasicNameValuePair("PASSWORD.DUMMY.MENSYS.1",  password));
         params.add(new BasicNameValuePair("BP101.DUMMY_B.MENSYS.1", "Login"));
