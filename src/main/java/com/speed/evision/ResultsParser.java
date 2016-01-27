@@ -36,43 +36,45 @@ public class ResultsParser {
 
     private Collection<Module> readResults(final String html) throws IOException {
         Document document = Jsoup.parse(html);
-        Elements rows = document.select("input[name=\"butselect\"]");
         List<Module> modules = new LinkedList<>();
+        Elements rows = document.select("tr");
         for (Element row : rows) {
-            String url = baseUrl + pathFromOnclick(row.attr("onclick"));
-            String moduleHtml = get(url);
-            modules.add(readModule(moduleHtml));
+            if (row.select("th").size() > 0) continue; // Skip headers
+            Elements tds = row.select("td");
+            if (tds.size() != 6) {
+                throw new RuntimeException("Module results table has changed, size is now: " + tds.size());
+            }
+            String year = tds.get(0).text();
+            String moduleCode = tds.get(1).text();
+            String moduleName = tds.get(2).text();
+            int credits = Integer.parseInt(tds.get(3).text().trim());
+            String markText = tds.get(4).text().trim();
+            int mark;
+            if (markText.contains("(")) {
+                System.out.println("Resit detected for " + moduleName + ", assuming pass (40)");
+                mark = 40;
+            } else {
+                mark = markText.equals("-") ? -1 : Integer.parseInt(markText);
+            }
+
+            Module module = new Module(year, moduleCode, moduleName, credits, mark);
+            modules.add(module);
+            System.out.println(module);
+            String url = baseUrl + pathFromOnclick(tds.get(5).select("input").first().attr("onclick"));
+            module.setResults(readModuleResults(get(url)));
+
         }
         return Collections.unmodifiableCollection(modules);
+
+
     }
 
-    private Module readModule(String html) {
+    private List<Module.Result> readModuleResults(String html) {
         Document document = Jsoup.parse(html);
-        Module module = null;
         List<Module.Result> results = new LinkedList<>();
         for (Element e : document.select("table")) {
             String summary = e.attr("summary");
-            if (summary.equals("details of overall module result")) {
-                // Process module result
-                Elements tds = e.select("td");
-                if (tds.size() != 5) {
-                    throw new RuntimeException("Format has changed, there are no longer 5 elements in the 'Overall module result' table");
-                }
-                String year = tds.get(0).text();
-                String moduleCode = tds.get(1).text();
-                String moduleName = tds.get(2).text();
-                int credits = Integer.parseInt(tds.get(3).text().trim());
-                String markText = tds.get(4).text().trim();
-                int mark;
-                if (markText.contains("(")) {
-                    System.out.println("Resit detected, assuming pass (40)");
-                    mark = 40;
-                } else {
-                    mark = markText.equals("-") ? -1 : Integer.parseInt(markText);
-                }
-                module = new Module(year, moduleCode, moduleName, credits, mark);
-                System.out.println(module);
-            } else if (summary.equals("details of assessment components and feedback if available")) {
+            if (summary.equals("details of assessment components and feedback if available")) {
                 // Process components
                 Elements rows = e.select("tr");
 
@@ -95,15 +97,10 @@ public class ResultsParser {
                 }
             }
         }
-        if (module == null) {
-            System.err.println("Page did not have any module results");
-        } else {
-            module.setResults(results);
-        }
         if (results.size() == 0) {
             System.err.println("Page did not have any module component results");
         }
-        return module;
+        return results;
     }
 
     private String get(String url) throws IOException {
